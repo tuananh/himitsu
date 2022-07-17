@@ -127,39 +127,50 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 
 	// Create AWS KMS key ring
 	logger.Debug("creating AWS KMS key ring")
-	createKeyInput := &awskms.CreateKeyInput{
-		// CustomKeyStoreId: &kmsKeyRing,
-		// Origin:           aws.String(awskms.OriginTypeAwsCloudhsm),
-		KeyUsage:    aws.String(awskms.KeyUsageTypeEncryptDecrypt),
-		Description: aws.String(kmsKeyRing),
-		Tags: []*kms.Tag{
-			{
-				TagKey:   aws.String("created-by"),
-				TagValue: aws.String("himitsu"),
-			},
-		},
-	}
-	createKeyOutput, err := c.awsKmsClient.CreateKeyWithContext(ctx, createKeyInput)
 
-	if err != nil {
-		logger.WithError(err).Error("failed to create AWS KMS key ring")
-		if aerr, ok := err.(awserr.Error); ok {
-			if aerr.Code() != awskms.ErrCodeAlreadyExistsException {
-				return fmt.Errorf("failed to create KMS crypto key %s: %w", kmsKeyRing, err)
+	keyAlreadyExists := false
+	if _, err := c.awsKmsClient.DescribeKey(&awskms.DescribeKeyInput{
+		KeyId: aws.String(fmt.Sprintf("alias/%s", kmsCryptoKey)),
+	}); err == nil {
+		keyAlreadyExists = true
+	}
+	if keyAlreadyExists {
+		logger.Debug("KMS key alias/%s already exists", kmsCryptoKey)
+	}
+
+	if !keyAlreadyExists {
+		logger.Debug("alias doesnt exists yet => creating AWS KMS key ring")
+		createKeyInput := &awskms.CreateKeyInput{
+			KeyUsage:    aws.String(awskms.KeyUsageTypeEncryptDecrypt),
+			Description: aws.String(kmsKeyRing),
+			Tags: []*kms.Tag{
+				{
+					TagKey:   aws.String("created-by"),
+					TagValue: aws.String("himitsu"),
+				},
+			},
+		}
+		createKeyOutput, err := c.awsKmsClient.CreateKeyWithContext(ctx, createKeyInput)
+		if err != nil {
+			logger.WithError(err).Error("failed to create AWS KMS key ring")
+			if aerr, ok := err.(awserr.Error); ok {
+				if aerr.Code() != awskms.ErrCodeAlreadyExistsException {
+					return fmt.Errorf("failed to create KMS crypto key %s: %w", kmsKeyRing, err)
+				}
 			}
 		}
-	}
 
-	createAliasInput := &awskms.CreateAliasInput{
-		AliasName:   aws.String(fmt.Sprintf("alias/%s", kmsCryptoKey)),
-		TargetKeyId: aws.String(*createKeyOutput.KeyMetadata.KeyId),
-	}
+		createAliasInput := &awskms.CreateAliasInput{
+			AliasName:   aws.String(fmt.Sprintf("alias/%s", kmsCryptoKey)),
+			TargetKeyId: aws.String(*createKeyOutput.KeyMetadata.KeyId),
+		}
 
-	if _, err := c.awsKmsClient.CreateAlias(createAliasInput); err != nil {
-		logger.WithError(err).Error("failed to create alias for KMS key")
-		if aerr, ok := err.(awserr.Error); ok {
-			if aerr.Code() != awskms.ErrCodeAlreadyExistsException {
-				return fmt.Errorf("failed to create KMS crypto key %s: %w", kmsKeyRing, err)
+		if _, err := c.awsKmsClient.CreateAliasWithContext(ctx, createAliasInput); err != nil {
+			logger.WithError(err).Error("failed to create alias for KMS key")
+			if aerr, ok := err.(awserr.Error); ok {
+				if aerr.Code() != awskms.ErrCodeAlreadyExistsException {
+					return fmt.Errorf("failed to create alias for KMS key %s: %w", kmsKeyRing, err)
+				}
 			}
 		}
 	}

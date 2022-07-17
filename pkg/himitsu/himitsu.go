@@ -16,6 +16,7 @@ import (
 	kms "cloud.google.com/go/kms/apiv1"
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	awskms "github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -72,7 +73,10 @@ func New(ctx context.Context, opts ...option.ClientOption) (*Client, error) {
 
 	var c Client
 
-	sess := session.Must(session.NewSession())
+	sess := session.Must(session.NewSession(&aws.Config{
+		// TODO: tuananh fix this
+		Region: aws.String("ap-southeast-1"),
+	}))
 	awsKmsClient := awskms.New(sess)
 	s3Client := s3.New(sess)
 	c.awsKmsClient = awsKmsClient
