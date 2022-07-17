@@ -223,10 +223,15 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 
 	// Set the bucket to private
 
-	// aclInput := &s3.PutBucketAclInput{
-	// 	Bucket: aws.String(bucket),
-	// 	ACL:    s3.BucketCannedACLPrivate,
-	// }
+	aclInput := &s3.PutBucketAclInput{
+		Bucket: aws.String(bucket),
+		ACL:    aws.String(s3.BucketCannedACLPrivate),
+	}
+
+	if _, err := c.s3Client.PutBucketAclWithContext(ctx, aclInput); err != nil {
+		logger.WithError(err).Error("failed to put S3 bucket ACL")
+		return fmt.Errorf("failed to S3 bucket ACL %s: %w", bucket, err)
+	}
 
 	// Create the storage bucket
 	logger.Debug("creating bucket")
