@@ -233,6 +233,36 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 		return fmt.Errorf("failed to S3 bucket ACL %s: %w", bucket, err)
 	}
 
+	// Set versioning to enabled
+	versioningInput := &s3.PutBucketVersioningInput{
+		Bucket: aws.String(bucket),
+		VersioningConfiguration: &s3.VersioningConfiguration{
+			Status: aws.String(s3.BucketVersioningStatusEnabled),
+		},
+	}
+
+	if _, err := c.s3Client.PutBucketVersioningWithContext(ctx, versioningInput); err != nil {
+		logger.WithError(err).Error("failed to put S3 bucket versioning")
+		return fmt.Errorf("failed to S3 bucket versioning %s: %w", bucket, err)
+	}
+
+	// Set bucket lifecycle
+
+	// lifecycleInput := &s3.PutBucketLifecycleConfigurationInput{
+	// 	Bucket: aws.String(bucket),
+	// 	LifecycleConfiguration: &s3.BucketLifecycleConfiguration{
+	// 		Rules: []*s3.LifecycleRule{
+	// 			{
+	// 				Expiration: &s3.LifecycleExpiration{Days: 10},
+	// 			},
+	// 		},
+	// 	},
+	// }
+	// if _, err := c.s3Client.PutBucketLifecycleConfigurationWithContext(ctx, lifecycleInput); err != nil {
+	// 	logger.WithError(err).Error("failed to put S3 bucket lifecycle configuration")
+	// 	return fmt.Errorf("failed to S3 bucket lifecycle configuration %s: %w", bucket, err)
+	// }
+
 	// Create the storage bucket
 	logger.Debug("creating bucket")
 
