@@ -16,6 +16,8 @@ import (
 	kms "cloud.google.com/go/kms/apiv1"
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go/aws/session"
+	awskms "github.com/aws/aws-sdk-go/service/kms"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 	storagev1 "google.golang.org/api/storage/v1"
@@ -52,6 +54,7 @@ const (
 
 // Client is a berglas client
 type Client struct {
+	awsKmsClient        *awskms.KMS
 	kmsClient           *kms.KeyManagementClient
 	secretManagerClient *secretmanager.Client
 	storageClient       *storage.Client
@@ -66,6 +69,10 @@ func New(ctx context.Context, opts ...option.ClientOption) (*Client, error) {
 	opts = append(opts, option.WithUserAgent(UserAgent))
 
 	var c Client
+
+	sess := session.Must(session.NewSession())
+	awsKmsClient := awskms.New(sess)
+	c.awsKmsClient = awsKmsClient
 
 	kmsClient, err := kms.NewKeyManagementClient(ctx, opts...)
 	if err != nil {
