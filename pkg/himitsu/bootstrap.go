@@ -135,11 +135,9 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 		keyAlreadyExists = true
 	}
 	if keyAlreadyExists {
-		logger.Debug("KMS key alias/%s already exists", kmsCryptoKey)
-	}
-
-	if !keyAlreadyExists {
-		logger.Debug("alias doesnt exists yet => creating AWS KMS key ring")
+		logger.Debug("KMS key alias/%s already exists. skipping", kmsCryptoKey)
+	} else {
+		logger.Debug("creating AWS KMS key ring")
 		createKeyInput := &awskms.CreateKeyInput{
 			KeyUsage:    aws.String(awskms.KeyUsageTypeEncryptDecrypt),
 			Description: aws.String(kmsKeyRing),
