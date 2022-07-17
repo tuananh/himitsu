@@ -5,17 +5,17 @@ import (
 	"log"
 	"os"
 
-	"github.com/tuananh/himitsu/pkg/berglas"
+	"github.com/tuananh/himitsu/pkg/himitsu"
 )
 
 var (
 	ctx       = context.Background()
-	client, _ = berglas.New(ctx)
+	client, _ = himitsu.New(ctx)
 
 	err          error
-	secret       *berglas.Secret
+	secret       *himitsu.Secret
 	plaintext    []byte
-	listResponse *berglas.ListResponse
+	listResponse *himitsu.ListResponse
 
 	project = os.Getenv("GOOGLE_CLOUD_PROJECT")
 	bucket  = os.Getenv("GOOGLE_CLOUD_BUCKET")
@@ -23,11 +23,11 @@ var (
 )
 
 func ExampleNew() {
-	client, err = berglas.New(ctx)
+	client, err = himitsu.New(ctx)
 }
 
 func ExampleClient_Access_secretManager() {
-	plaintext, err = client.Access(ctx, &berglas.SecretManagerAccessRequest{
+	plaintext, err = client.Access(ctx, &himitsu.SecretManagerAccessRequest{
 		Project: project,
 		Name:    "my-secret",
 	})
@@ -36,7 +36,7 @@ func ExampleClient_Access_secretManager() {
 }
 
 func ExampleClient_Access_storage() {
-	plaintext, err = client.Access(ctx, &berglas.StorageAccessRequest{
+	plaintext, err = client.Access(ctx, &himitsu.StorageAccessRequest{
 		Bucket: bucket,
 		Object: "my-secret",
 	})
@@ -46,11 +46,11 @@ func ExampleClient_Access_storage() {
 
 func ExampleClient_Bootstrap_secretManager() {
 	// This is a noop - there's nothing to bootstrap with Secret Manager
-	err = client.Bootstrap(ctx, &berglas.SecretManagerBootstrapRequest{})
+	err = client.Bootstrap(ctx, &himitsu.SecretManagerBootstrapRequest{})
 }
 
 func ExampleClient_Bootstrap_storage() {
-	err = client.Bootstrap(ctx, &berglas.StorageBootstrapRequest{
+	err = client.Bootstrap(ctx, &himitsu.StorageBootstrapRequest{
 		ProjectID:      "my-project",
 		Bucket:         bucket,
 		BucketLocation: "US",
@@ -61,7 +61,7 @@ func ExampleClient_Bootstrap_storage() {
 }
 
 func ExampleClient_Create_secretManager() {
-	secret, err = client.Create(ctx, &berglas.SecretManagerCreateRequest{
+	secret, err = client.Create(ctx, &himitsu.SecretManagerCreateRequest{
 		Project:   project,
 		Name:      "my-secret",
 		Plaintext: []byte("my secret data"),
@@ -71,7 +71,7 @@ func ExampleClient_Create_secretManager() {
 }
 
 func ExampleClient_Create_storage() {
-	secret, err = client.Create(ctx, &berglas.StorageCreateRequest{
+	secret, err = client.Create(ctx, &himitsu.StorageCreateRequest{
 		Bucket:    bucket,
 		Object:    "my-secret",
 		Key:       key,
@@ -82,21 +82,21 @@ func ExampleClient_Create_storage() {
 }
 
 func ExampleClient_Delete_secretManager() {
-	err = client.Delete(ctx, &berglas.SecretManagerDeleteRequest{
+	err = client.Delete(ctx, &himitsu.SecretManagerDeleteRequest{
 		Project: project,
 		Name:    "my-secret",
 	})
 }
 
 func ExampleClient_Delete_storage() {
-	err = client.Delete(ctx, &berglas.StorageDeleteRequest{
+	err = client.Delete(ctx, &himitsu.StorageDeleteRequest{
 		Bucket: bucket,
 		Object: "my-secret",
 	})
 }
 
 func ExampleClient_Grant_secretManager() {
-	err = client.Grant(ctx, &berglas.SecretManagerGrantRequest{
+	err = client.Grant(ctx, &himitsu.SecretManagerGrantRequest{
 		Project: project,
 		Name:    "my-secret",
 		Members: []string{
@@ -106,7 +106,7 @@ func ExampleClient_Grant_secretManager() {
 }
 
 func ExampleClient_Grant_storage() {
-	err = client.Grant(ctx, &berglas.StorageGrantRequest{
+	err = client.Grant(ctx, &himitsu.StorageGrantRequest{
 		Bucket: bucket,
 		Object: "my-secret",
 		Members: []string{
@@ -116,7 +116,7 @@ func ExampleClient_Grant_storage() {
 }
 
 func ExampleClient_List_secretManager() {
-	listResponse, err = client.List(ctx, &berglas.SecretManagerListRequest{
+	listResponse, err = client.List(ctx, &himitsu.SecretManagerListRequest{
 		Project: project,
 	})
 
@@ -124,7 +124,7 @@ func ExampleClient_List_secretManager() {
 }
 
 func ExampleClient_List_storage() {
-	listResponse, err = client.List(ctx, &berglas.StorageListRequest{
+	listResponse, err = client.List(ctx, &himitsu.StorageListRequest{
 		Bucket: bucket,
 	})
 
@@ -132,7 +132,7 @@ func ExampleClient_List_storage() {
 }
 
 func ExampleClient_Read_secretManager() {
-	secret, err = client.Read(ctx, &berglas.SecretManagerReadRequest{
+	secret, err = client.Read(ctx, &himitsu.SecretManagerReadRequest{
 		Project: project,
 		Name:    "my-secret",
 		Version: "12",
@@ -142,7 +142,7 @@ func ExampleClient_Read_secretManager() {
 }
 
 func ExampleClient_Read_storage() {
-	secret, err = client.Read(ctx, &berglas.StorageReadRequest{
+	secret, err = client.Read(ctx, &himitsu.StorageReadRequest{
 		Bucket:     bucket,
 		Object:     "my-secret",
 		Generation: secret.Generation,
@@ -152,7 +152,7 @@ func ExampleClient_Read_storage() {
 }
 
 func ExampleClient_Revoke_secretManager() {
-	err = client.Revoke(ctx, &berglas.SecretManagerRevokeRequest{
+	err = client.Revoke(ctx, &himitsu.SecretManagerRevokeRequest{
 		Project: project,
 		Name:    "my-secret",
 		Members: []string{
@@ -162,7 +162,7 @@ func ExampleClient_Revoke_secretManager() {
 }
 
 func ExampleClient_Revoke_storage() {
-	err = client.Revoke(ctx, &berglas.StorageRevokeRequest{
+	err = client.Revoke(ctx, &himitsu.StorageRevokeRequest{
 		Bucket: bucket,
 		Object: "my-secret",
 		Members: []string{
@@ -192,7 +192,7 @@ func ExampleClient_Resolve_storage() {
 }
 
 func ExampleClient_Update_secretManager() {
-	secret, err = client.Update(ctx, &berglas.SecretManagerUpdateRequest{
+	secret, err = client.Update(ctx, &himitsu.SecretManagerUpdateRequest{
 		Project:   project,
 		Name:      "my-secret",
 		Plaintext: []byte("my updated secret data"),
@@ -202,7 +202,7 @@ func ExampleClient_Update_secretManager() {
 }
 
 func ExampleClient_Update_storage() {
-	secret, err = client.Update(ctx, &berglas.StorageUpdateRequest{
+	secret, err = client.Update(ctx, &himitsu.StorageUpdateRequest{
 		Bucket:         bucket,
 		Object:         "my-secret",
 		Generation:     secret.Generation,
