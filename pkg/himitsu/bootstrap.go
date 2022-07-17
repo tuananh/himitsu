@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/aws/aws-sdk-go/aws"
+	awskms "github.com/aws/aws-sdk-go/service/kms"
+	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
 	kmspb "google.golang.org/genproto/googleapis/cloud/kms/v1"
@@ -87,9 +90,9 @@ func (c *Client) secretManagerBootstrap(ctx context.Context, i *SecretManagerBoo
 
 func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapRequest) error {
 	projectID := i.ProjectID
-	if projectID == "" {
-		return fmt.Errorf("missing project ID")
-	}
+	// if projectID == "" {
+	// 	return fmt.Errorf("missing project ID")
+	// }
 
 	bucket := i.Bucket
 	if bucket == "" {
@@ -127,6 +130,15 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 
 	logger.Debug("bootstrap.start")
 	defer logger.Debug("bootstrap.finish")
+
+	// Create AWS KMS key ring
+	logger.Debug("creating AWS KMS key ring")
+	createKeyInput := &awskms.CreateKeyInput{}
+	if _, err := c.awsKmsClient.CreateKeyWithContext(ctx, createKeyInput); err != nil {
+		logger.WithError(err).Error("failed to create AWS KMS key ring")
+
+		return fmt.Errorf("failed to create AWS KMS key ring %s: %w", kmsKeyRing, err)
+	}
 
 	// Create the KMS key ring
 	logger.Debug("creating KMS key ring")
@@ -175,6 +187,46 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 			return fmt.Errorf("failed to create KMS crypto key %s: %w", kmsCryptoKey, err)
 		}
 	}
+
+	// Create S3 bucket
+	logger.Debug("creating S3 bucket")
+	input := &s3.CreateBucketInput{
+		Bucket: aws.String(bucket),
+		// ACL:    &s3.BucketCannedACLPrivate,
+		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
+			// TODO: (tuananh) remove hardcode region
+			// enable versioning, private by default and other stuff
+			LocationConstraint: aws.String(bucketLocation),
+		},
+	}
+
+	if _, err := c.s3Client.CreateBucketWithContext(ctx, input); err != nil {
+		logger.WithError(err).Error("failed to create S3 bucket")
+		return fmt.Errorf("failed to create storage bucket %s: %w", bucket, err)
+	}
+
+	putInput := &s3.PutBucketTaggingInput{
+		Bucket: aws.String(bucket),
+		Tagging: &s3.Tagging{
+			TagSet: []*s3.Tag{
+				{
+					Key:   aws.String("purpose"),
+					Value: aws.String("himitsu"),
+				},
+			},
+		},
+	}
+	if _, err := c.s3Client.PutBucketTaggingWithContext(ctx, putInput); err != nil {
+		logger.WithError(err).Error("failed to put S3 bucket tagging")
+		return fmt.Errorf("failed to S3 bucket tagging %s: %w", bucket, err)
+	}
+
+	// Set the bucket to private
+
+	// aclInput := &s3.PutBucketAclInput{
+	// 	Bucket: aws.String(bucket),
+	// 	ACL:    s3.BucketCannedACLPrivate,
+	// }
 
 	// Create the storage bucket
 	logger.Debug("creating bucket")
