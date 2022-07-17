@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -12,11 +11,6 @@ import (
 	awskms "github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/sirupsen/logrus"
-	kmspb "google.golang.org/genproto/googleapis/cloud/kms/v1"
-	grpccodes "google.golang.org/grpc/codes"
-	grpcstatus "google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type bootstrapRequest interface {
@@ -134,7 +128,10 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 	// Create AWS KMS key ring
 	logger.Debug("creating AWS KMS key ring")
 	createKeyInput := &awskms.CreateKeyInput{
-		CustomerMasterKeySpec: &kmsKeyRing,
+		// CustomKeyStoreId: &kmsKeyRing,
+		// Origin:           aws.String(awskms.OriginTypeAwsCloudhsm),
+		KeyUsage:    aws.String(awskms.KeyUsageTypeEncryptDecrypt),
+		Description: aws.String(kmsKeyRing),
 		Tags: []*kms.Tag{
 			{
 				TagKey:   aws.String("created-by"),
@@ -142,10 +139,26 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 			},
 		},
 	}
-	if _, err := c.awsKmsClient.CreateKeyWithContext(ctx, createKeyInput); err != nil {
+	createKeyOutput, err := c.awsKmsClient.CreateKeyWithContext(ctx, createKeyInput)
+
+	if err != nil {
 		logger.WithError(err).Error("failed to create AWS KMS key ring")
 		if aerr, ok := err.(awserr.Error); ok {
-			if aerr.Code() != kms.ErrCodeAlreadyExistsException {
+			if aerr.Code() != awskms.ErrCodeAlreadyExistsException {
+				return fmt.Errorf("failed to create KMS crypto key %s: %w", kmsKeyRing, err)
+			}
+		}
+	}
+
+	createAliasInput := &awskms.CreateAliasInput{
+		AliasName:   aws.String(fmt.Sprintf("alias/%s", kmsCryptoKey)),
+		TargetKeyId: aws.String(*createKeyOutput.KeyMetadata.KeyId),
+	}
+
+	if _, err := c.awsKmsClient.CreateAlias(createAliasInput); err != nil {
+		logger.WithError(err).Error("failed to create alias for KMS key")
+		if aerr, ok := err.(awserr.Error); ok {
+			if aerr.Code() != awskms.ErrCodeAlreadyExistsException {
 				return fmt.Errorf("failed to create KMS crypto key %s: %w", kmsKeyRing, err)
 			}
 		}
@@ -168,66 +181,67 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 	// }
 
 	// Create the KMS crypto key
-	logger.Debug("creating KMS crypto key")
-	datakeyInput := &kms.GenerateDataKeyInput{
-		KeyId: &kmsCryptoKey,
-	}
-	if _, err := c.awsKmsClient.GenerateDataKeyWithContext(ctx, datakeyInput); err != nil {
-		logger.WithError(err).Error("failed to create KMS data key")
-		return fmt.Errorf("failed to create KMS data key %s: %w", kmsCryptoKey, err)
-	}
+	// logger.Debug("creating KMS crypto key")
+	// datakeyInput := &kms.GenerateDataKeyInput{
+	// 	KeyId: &kmsCryptoKey,
+	// }
+	// if _, err := c.awsKmsClient.GenerateDataKeyWithContext(ctx, datakeyInput); err != nil {
+	// 	logger.WithError(err).Error("failed to create KMS data key")
+	// 	return fmt.Errorf("failed to create KMS data key %s: %w", kmsCryptoKey, err)
+	// }
 
 	// ...
-	rotationPeriod := 30 * 24 * time.Hour
-	if _, err := c.kmsClient.CreateCryptoKey(ctx, &kmspb.CreateCryptoKeyRequest{
-		Parent: fmt.Sprintf("projects/%s/locations/%s/keyRings/%s",
-			projectID, kmsLocation, kmsKeyRing),
-		CryptoKeyId: kmsCryptoKey,
-		CryptoKey: &kmspb.CryptoKey{
-			Purpose: kmspb.CryptoKey_ENCRYPT_DECRYPT,
-			RotationSchedule: &kmspb.CryptoKey_RotationPeriod{
-				RotationPeriod: &durationpb.Duration{
-					Seconds: int64(rotationPeriod.Seconds()),
-				},
-			},
-			NextRotationTime: &timestamppb.Timestamp{
-				Seconds: time.Now().Add(time.Duration(rotationPeriod)).Unix(),
-			},
-			VersionTemplate: &kmspb.CryptoKeyVersionTemplate{
-				Algorithm:       kmspb.CryptoKeyVersion_GOOGLE_SYMMETRIC_ENCRYPTION,
-				ProtectionLevel: kmspb.ProtectionLevel_SOFTWARE,
-			},
-		},
-	}); err != nil {
-		logger.WithError(err).Error("failed to create KMS crypto key")
+	// rotationPeriod := 30 * 24 * time.Hour
+	// if _, err := c.kmsClient.CreateCryptoKey(ctx, &kmspb.CreateCryptoKeyRequest{
+	// 	Parent: fmt.Sprintf("projects/%s/locations/%s/keyRings/%s",
+	// 		projectID, kmsLocation, kmsKeyRing),
+	// 	CryptoKeyId: kmsCryptoKey,
+	// 	CryptoKey: &kmspb.CryptoKey{
+	// 		Purpose: kmspb.CryptoKey_ENCRYPT_DECRYPT,
+	// 		RotationSchedule: &kmspb.CryptoKey_RotationPeriod{
+	// 			RotationPeriod: &durationpb.Duration{
+	// 				Seconds: int64(rotationPeriod.Seconds()),
+	// 			},
+	// 		},
+	// 		NextRotationTime: &timestamppb.Timestamp{
+	// 			Seconds: time.Now().Add(time.Duration(rotationPeriod)).Unix(),
+	// 		},
+	// 		VersionTemplate: &kmspb.CryptoKeyVersionTemplate{
+	// 			Algorithm:       kmspb.CryptoKeyVersion_GOOGLE_SYMMETRIC_ENCRYPTION,
+	// 			ProtectionLevel: kmspb.ProtectionLevel_SOFTWARE,
+	// 		},
+	// 	},
+	// }); err != nil {
+	// 	logger.WithError(err).Error("failed to create KMS crypto key")
 
-		terr, ok := grpcstatus.FromError(err)
-		if !ok || terr.Code() != grpccodes.AlreadyExists {
-			return fmt.Errorf("failed to create KMS crypto key %s: %w", kmsCryptoKey, err)
-		}
-	}
+	// 	terr, ok := grpcstatus.FromError(err)
+	// 	if !ok || terr.Code() != grpccodes.AlreadyExists {
+	// 		return fmt.Errorf("failed to create KMS crypto key %s: %w", kmsCryptoKey, err)
+	// 	}
+	// }
 
 	// Create S3 bucket
 	logger.Debug("creating S3 bucket")
-	input := &s3.CreateBucketInput{
+	createBucketInput := &s3.CreateBucketInput{
 		Bucket: aws.String(bucket),
 		ACL:    aws.String(s3.BucketCannedACLPrivate),
 		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-			LocationConstraint: aws.String(bucketLocation),
+			// TODO: (tuananh) fix this hardcode region
+			LocationConstraint: aws.String("ap-southeast-1"),
 		},
 	}
 
-	if _, err := c.s3Client.CreateBucketWithContext(ctx, input); err != nil {
+	if _, err := c.s3Client.CreateBucketWithContext(ctx, createBucketInput); err != nil {
 		logger.WithError(err).Error("failed to create S3 bucket")
 		if aerr, ok := err.(awserr.Error); ok {
-			if aerr.Code() != s3.ErrCodeBucketAlreadyExists {
+			if aerr.Code() != s3.ErrCodeBucketAlreadyExists && aerr.Code() != s3.ErrCodeBucketAlreadyOwnedByYou {
 				return fmt.Errorf("failed to create storage bucket %s: %w", bucket, err)
 			}
 		}
 	}
 
 	// Set bucket tags
-	putInput := &s3.PutBucketTaggingInput{
+	taggingInput := &s3.PutBucketTaggingInput{
 		Bucket: aws.String(bucket),
 		Tagging: &s3.Tagging{
 			TagSet: []*s3.Tag{
@@ -238,9 +252,9 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 			},
 		},
 	}
-	if _, err := c.s3Client.PutBucketTaggingWithContext(ctx, putInput); err != nil {
-		logger.WithError(err).Error("failed to put S3 bucket tagging")
-		return fmt.Errorf("failed to S3 bucket tagging %s: %w", bucket, err)
+	if _, err := c.s3Client.PutBucketTaggingWithContext(ctx, taggingInput); err != nil {
+		logger.WithError(err).Error("failed to tag S3 bucket")
+		return fmt.Errorf("failed to tag S3 bucket %s: %w", bucket, err)
 	}
 
 	// Set versioning to enabled
@@ -256,26 +270,29 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 		return fmt.Errorf("failed to S3 bucket versioning %s: %w", bucket, err)
 	}
 
+	// TODO: (tuananh) fix this
+
 	// Set bucket lifecycle
-	lifecycleInput := &s3.PutBucketLifecycleConfigurationInput{
-		Bucket: aws.String(bucket),
-		LifecycleConfiguration: &s3.BucketLifecycleConfiguration{
-			Rules: []*s3.LifecycleRule{
-				{
-					NoncurrentVersionExpiration: &s3.NoncurrentVersionExpiration{
-						NewerNoncurrentVersions: aws.Int64(10),
-					},
-					Expiration: &s3.LifecycleExpiration{
-						ExpiredObjectDeleteMarker: aws.Bool(true),
-					},
-				},
-			},
-		},
-	}
-	if _, err := c.s3Client.PutBucketLifecycleConfigurationWithContext(ctx, lifecycleInput); err != nil {
-		logger.WithError(err).Error("failed to put S3 bucket lifecycle configuration")
-		return fmt.Errorf("failed to S3 bucket lifecycle configuration %s: %w", bucket, err)
-	}
+	// lifecycleInput := &s3.PutBucketLifecycleConfigurationInput{
+	// 	Bucket: aws.String(bucket),
+	// 	LifecycleConfiguration: &s3.BucketLifecycleConfiguration{
+	// 		Rules: []*s3.LifecycleRule{
+	// 			{
+	// 				NoncurrentVersionExpiration: &s3.NoncurrentVersionExpiration{
+	// 					NewerNoncurrentVersions: aws.Int64(10),
+	// 				},
+	// 				// Expiration: &s3.LifecycleExpiration{
+	// 				// 	ExpiredObjectDeleteMarker: aws.Bool(true),
+	// 				// },
+	// 				Status: aws.String("Enabled"),
+	// 			},
+	// 		},
+	// 	},
+	// }
+	// if _, err := c.s3Client.PutBucketLifecycleConfigurationWithContext(ctx, lifecycleInput); err != nil {
+	// 	logger.WithError(err).Error("failed to put S3 bucket lifecycle configuration")
+	// 	return fmt.Errorf("failed to S3 bucket lifecycle configuration %s: %w", bucket, err)
+	// }
 
 	return nil
 }

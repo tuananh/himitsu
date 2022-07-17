@@ -78,29 +78,29 @@ func New(ctx context.Context, opts ...option.ClientOption) (*Client, error) {
 	c.awsKmsClient = awsKmsClient
 	c.s3Client = s3Client
 
-	kmsClient, err := kms.NewKeyManagementClient(ctx, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create kms client: %w", err)
-	}
-	c.kmsClient = kmsClient
+	// kmsClient, err := kms.NewKeyManagementClient(ctx, opts...)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create kms client: %w", err)
+	// }
+	// c.kmsClient = kmsClient
 
-	secretManagerClient, err := secretmanager.NewClient(ctx, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create secretManager client: %w", err)
-	}
-	c.secretManagerClient = secretManagerClient
+	// secretManagerClient, err := secretmanager.NewClient(ctx, opts...)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create secretManager client: %w", err)
+	// }
+	// c.secretManagerClient = secretManagerClient
 
-	storageClient, err := storage.NewClient(ctx, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage client: %w", err)
-	}
-	c.storageClient = storageClient
+	// storageClient, err := storage.NewClient(ctx, opts...)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create storage client: %w", err)
+	// }
+	// c.storageClient = storageClient
 
-	storageIAMClient, err := storagev1.NewService(ctx, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storagev1 client: %w", err)
-	}
-	c.storageIAMClient = storageIAMClient
+	// storageIAMClient, err := storagev1.NewService(ctx, opts...)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create storagev1 client: %w", err)
+	// }
+	// c.storageIAMClient = storageIAMClient
 
 	c.logger = &logrus.Logger{
 		Out:          os.Stderr,
