@@ -1,4 +1,4 @@
-// Copyright 2019 The Berglas Authors
+// Copyright 2019 The himitsu Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,9 +29,9 @@ import (
 	"syscall"
 	"text/tabwriter"
 
-	"github.com/GoogleCloudPlatform/berglas/pkg/berglas"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/tuananh/himitsu/pkg/himitsu"
 )
 
 const (
@@ -74,10 +74,10 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "berglas",
+	Use:   "himitsu",
 	Short: "Interact with encrypted secrets",
 	Long: strings.Trim(`
-berglas is a CLI tool to reading, writing, and deleting secrets from a Cloud
+himitsu is a CLI tool to reading, writing, and deleting secrets from a Cloud
 Storage bucket encrypted with a Google Cloud KMS key. Secrets are encrypted
 locally using envelope encryption before being uploaded to Cloud Storage.
 
@@ -94,7 +94,7 @@ For more information and examples, see the help text for a specific command.
 `, "\n"),
 	SilenceErrors: true,
 	SilenceUsage:  true,
-	Version:       berglas.Version,
+	Version:       himitsu.Version,
 }
 
 var accessCmd = &cobra.Command{
@@ -109,10 +109,10 @@ characters.
 `, "\n"),
 	Example: strings.Trim(`
   # Read a secret named "api-key" from the bucket "my-secrets"
-  berglas access my-secrets/api-key
+  himitsu access my-secrets/api-key
 
   # Read generation 1563925940580201 of a secret named "api-key" from the bucket "my-secrets"
-  berglas access my-secrets/api-key#1563925940580201
+  himitsu access my-secrets/api-key#1563925940580201
 `, "\n"),
 	Args: cobra.ExactArgs(1),
 	RunE: accessRun,
@@ -120,9 +120,9 @@ characters.
 
 var bootstrapCmd = &cobra.Command{
 	Use:   "bootstrap",
-	Short: "Bootstrap a berglas environment",
+	Short: "Bootstrap a himitsu environment",
 	Long: strings.Trim(`
-Bootstrap a Berglas environment by creating a Cloud Storage bucket and a Cloud
+Bootstrap a himitsu environment by creating a Cloud Storage bucket and a Cloud
 KMS key with properly scoped permissions to the caller.
 
 This command will create a new Cloud Storage bucket with "private" ACLs and
@@ -135,8 +135,8 @@ specified project. If the key ring or crypto key already exist, no errors are
 returned.
 `, "\n"),
 	Example: strings.Trim(`
-  # Bootstrap a berglas environment
-  berglas bootstrap --project my-project --bucket my-bucket
+  # Bootstrap a himitsu environment
+  himitsu bootstrap --project my-project --bucket my-bucket
 `, "\n"),
 	Args: cobra.ExactArgs(0),
 	RunE: bootstrapRun,
@@ -162,10 +162,10 @@ Zsh users may also put the file somewhere on their $fpath, like
 `, "\n"),
 	Example: strings.Trim(`
   # Enable completion for bash users
-  source <(berglas completion bash)
+  source <(himitsu completion bash)
 
   # Enable completion for zsh users
-  source <(berglas completion zsh)
+  source <(himitsu completion zsh)
 `, "\n"),
 	RunE: completionRun,
 }
@@ -181,14 +181,14 @@ Use the "edit" or "update" commands to update an existing secret.
 `, "\n"),
 	Example: strings.Trim(`
   # Create a secret named "api-key" with the contents "abcd1234"
-  berglas create my-secrets/api-key abcd1234 \
+  himitsu create my-secrets/api-key abcd1234 \
     --key projects/my-p/locations/global/keyRings/my-kr/cryptoKeys/my-k
 
   # Read a secret from stdin
-  echo ${SECRET} | berglas create my-secrets/api-key - --key...
+  echo ${SECRET} | himitsu create my-secrets/api-key - --key...
 
   # Read a secret from a local file
-  berglas create my-secrets/api-key @/path/to/file --key...
+  himitsu create my-secrets/api-key @/path/to/file --key...
 `, "\n"),
 	Args: cobra.ExactArgs(2),
 	RunE: createRun,
@@ -205,7 +205,7 @@ This command will exit successfully even if the secret does not exist.
 `, "\n"),
 	Example: strings.Trim(`
   # Delete a secret named "api-key"
-  berglas delete my-secrets/api-key
+  himitsu delete my-secrets/api-key
 `, "\n"),
 	Args: cobra.ExactArgs(1),
 	RunE: deleteRun,
@@ -225,10 +225,10 @@ the secret to be updated.
 `, "\n"),
 	Example: strings.Trim(`
   # Edit a secret named "api-key" from the bucket "my-secrets"
-  berglas edit my-secrets/api-key
+  himitsu edit my-secrets/api-key
 
   # Edit a secret named "api-key" from the bucket "my-secrets" using emacs
-  berglas edit my-secrets/api-key --editor emacs
+  himitsu edit my-secrets/api-key --editor emacs
 `, "\n"),
 	Args: cobra.ExactArgs(1),
 	RunE: editRun,
@@ -238,21 +238,21 @@ var execCmd = &cobra.Command{
 	Use:   "exec -- SUBCOMMAND",
 	Short: "Spawn an environment with secrets",
 	Long: strings.Trim(`
-Parse berglas references and spawn the given command with the secrets in the
+Parse himitsu references and spawn the given command with the secrets in the
 childprocess environment similar to exec(1). This is very useful in Docker
 containers or languages that do not support auto-import.
 
-Berglas will remain the parent process, but stdin, stdout, stderr, and any
+himitsu will remain the parent process, but stdin, stdout, stderr, and any
 signals are proxied to the child process.
 
-WARNING: Using berglas exec exposes secrets in plaintext in environment
+WARNING: Using himitsu exec exposes secrets in plaintext in environment
 variables. You should have a strong understanding of your software supply
-chain security before blindly running a process with berglas exec. The
+chain security before blindly running a process with himitsu exec. The
 resolved secrets will be in plaintext and available to the entire process.
 `, "\n"),
 	Example: strings.Trim(`
   # Spawn a subshell with secrets populated
-  berglas exec -- ${SHELL}
+  himitsu exec -- ${SHELL}
 `, "\n"),
 	Args: cobra.MinimumNArgs(1),
 	RunE: execRun,
@@ -279,14 +279,14 @@ Members must be specified with their type, for example:
 `, "\n"),
 	Example: strings.Trim(`
   # Grant access to a user
-  berglas grant my-secrets/api-key --member user:user@mydomain.com
+  himitsu grant my-secrets/api-key --member user:user@mydomain.com
 
   # Grant access to service account
-  berglas grant my-secrets/api-key \
+  himitsu grant my-secrets/api-key \
     --member serviceAccount:sa@project.iam.gserviceaccount.com
 
   # Add multiple members
-  berglas grant my-secrets/api-key \
+  himitsu grant my-secrets/api-key \
     --member user:user@mydomain.com \
     --member serviceAccount:sa@project.iam.gserviceaccount.com
 `, "\n"),
@@ -304,13 +304,13 @@ the "access" command instead.
 `, "\n"),
 	Example: strings.Trim(`
   # List all secrets in the bucket "my-secrets"
-  berglas list my-secrets
+  himitsu list my-secrets
 
   # List all secrets with names starting with "secret" in the bucket "my-secrets"
-  berglas list my-secrets --prefix secret
+  himitsu list my-secrets --prefix secret
 
   # List all generations of all secrets in the bucket "my-secrets"
-  berglas list my-secrets --all-generations
+  himitsu list my-secrets --all-generations
 `, "\n"),
 	Args: cobra.ExactArgs(1),
 	RunE: listRun,
@@ -318,7 +318,7 @@ the "access" command instead.
 
 var migrateCmd = &cobra.Command{
 	Use:   "migrate BUCKET ",
-	Short: "Migrate Berglas secrets to Secret Manager",
+	Short: "Migrate himitsu secrets to Secret Manager",
 	Long: strings.Trim(`
 Migrate secrets in the given Google Cloud Storage bucket to Secret Manager. This
 is designed to be a single-use command and should not be used as part of a
@@ -338,7 +338,7 @@ avoid quota limits and to discourage recurrent use.
 	Example: strings.Trim(`
   # Migrate all secrets in the "my-secrets" bucket to Secret Manager in the
   # project "my-project"
-  berglas migrate my-secrets --project my-project
+  himitsu migrate my-secrets --project my-project
 `, "\n"),
 	Args: cobra.ExactArgs(1),
 	RunE: migrateRun,
@@ -370,14 +370,14 @@ Members must be specified with their type, for example:
 `, "\n"),
 	Example: strings.Trim(`
   # Revoke access from a user
-  berglas revoke my-secrets/api-key --member user:user@mydomain.com
+  himitsu revoke my-secrets/api-key --member user:user@mydomain.com
 
   # Revoke revoke from a service account
-  berglas grant my-secrets/api-key \
+  himitsu grant my-secrets/api-key \
     --member serviceAccount:sa@project.iam.gserviceaccount.com
 
   # Remove multiple members
-  berglas revoke my-secrets/api-key \
+  himitsu revoke my-secrets/api-key \
     --member user:user@mydomain.com \
     --member serviceAccount:sa@project.iam.gserviceaccount.com
 `, "\n"),
@@ -396,14 +396,14 @@ already exist.
 `, "\n"),
 	Example: strings.Trim(`
   # Update the secret named "api-key" with the contents "new-contents"
-  berglas update my-secrets/api-key new-contents
+  himitsu update my-secrets/api-key new-contents
 
   # Update the secret named "api-key" with a new KMS encryption key, keeping
   # the original secret value
-  berglas update my-secrets/api-key --key=...
+  himitsu update my-secrets/api-key --key=...
 
   # Update the secret named "api-key", creating it if it does not already exist
-  berglas update my-secrets/api-key abcd1234 --create-if-missing --key...
+  himitsu update my-secrets/api-key abcd1234 --create-if-missing --key...
 `, "\n"),
 	Args: cobra.RangeArgs(1, 2),
 	RunE: updateRun,
@@ -440,9 +440,9 @@ func main() {
 		"Location in which to create Cloud Storage bucket")
 	bootstrapCmd.Flags().StringVar(&kmsLocation, "kms-location", "global",
 		"Location in which to create the Cloud KMS key ring")
-	bootstrapCmd.Flags().StringVar(&kmsKeyRing, "kms-keyring", "berglas",
+	bootstrapCmd.Flags().StringVar(&kmsKeyRing, "kms-keyring", "himitsu",
 		"Name of the KMS key ring to create")
-	bootstrapCmd.Flags().StringVar(&kmsCryptoKey, "kms-key", "berglas-key",
+	bootstrapCmd.Flags().StringVar(&kmsCryptoKey, "kms-key", "himitsu-key",
 		"Name of the KMS key to create")
 
 	rootCmd.AddCommand(completionCmd)
@@ -526,8 +526,8 @@ func accessRun(cmd *cobra.Command, args []string) error {
 	}
 
 	switch t := ref.Type(); t {
-	case berglas.ReferenceTypeSecretManager:
-		plaintext, err := client.Access(ctx, &berglas.SecretManagerAccessRequest{
+	case himitsu.ReferenceTypeSecretManager:
+		plaintext, err := client.Access(ctx, &himitsu.SecretManagerAccessRequest{
 			Project: ref.Project(),
 			Name:    ref.Name(),
 			Version: ref.Version(),
@@ -536,8 +536,8 @@ func accessRun(cmd *cobra.Command, args []string) error {
 			return apiError(err)
 		}
 		fmt.Fprintf(stdout, "%s", plaintext)
-	case berglas.ReferenceTypeStorage:
-		plaintext, err := client.Access(ctx, &berglas.StorageAccessRequest{
+	case himitsu.ReferenceTypeStorage:
+		plaintext, err := client.Access(ctx, &himitsu.StorageAccessRequest{
 			Bucket:     ref.Bucket(),
 			Object:     ref.Object(),
 			Generation: ref.Generation(),
@@ -560,7 +560,7 @@ func bootstrapRun(cmd *cobra.Command, args []string) error {
 		return misuseError(err)
 	}
 
-	if err := client.Bootstrap(ctx, &berglas.BootstrapRequest{
+	if err := client.Bootstrap(ctx, &himitsu.BootstrapRequest{
 		ProjectID:      projectID,
 		Bucket:         bucket,
 		BucketLocation: bucketLocation,
@@ -574,22 +574,22 @@ func bootstrapRun(cmd *cobra.Command, args []string) error {
 	kmsKeyID := fmt.Sprintf("projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s",
 		projectID, kmsLocation, kmsKeyRing, kmsCryptoKey)
 
-	fmt.Fprintf(stdout, "Successfully created berglas environment:\n")
+	fmt.Fprintf(stdout, "Successfully created himitsu environment:\n")
 	fmt.Fprintf(stdout, "\n")
 	fmt.Fprintf(stdout, "  Bucket: %s\n", bucket)
 	fmt.Fprintf(stdout, "  KMS key: %s\n", kmsKeyID)
 	fmt.Fprintf(stdout, "\n")
 	fmt.Fprintf(stdout, "To create a secret:\n")
 	fmt.Fprintf(stdout, "\n")
-	fmt.Fprintf(stdout, "  berglas create %s/my-secret abcd1234 \\\n", bucket)
+	fmt.Fprintf(stdout, "  himitsu create %s/my-secret abcd1234 \\\n", bucket)
 	fmt.Fprintf(stdout, "    --key %s\n", kmsKeyID)
 	fmt.Fprintf(stdout, "\n")
 	fmt.Fprintf(stdout, "To grant access to that secret:\n")
 	fmt.Fprintf(stdout, "\n")
-	fmt.Fprintf(stdout, "  berglas grant %s/my-secret \\\n", bucket)
+	fmt.Fprintf(stdout, "  himitsu grant %s/my-secret \\\n", bucket)
 	fmt.Fprintf(stdout, "    --member user:jane.doe@mycompany.com\n")
 	fmt.Fprintf(stdout, "\n")
-	fmt.Fprintf(stdout, "For more help and examples, please run \"berglas -h\".\n")
+	fmt.Fprintf(stdout, "For more help and examples, please run \"himitsu -h\".\n")
 	return nil
 }
 
@@ -606,8 +606,8 @@ func completionRun(cmd *cobra.Command, args []string) error {
 			return apiError(err)
 		}
 
-		// enable the `source <(berglas completion SHELL)` pattern for zsh
-		if _, err := io.WriteString(stdout, "compdef _berglas berglas\n"); err != nil {
+		// enable the `source <(himitsu completion SHELL)` pattern for zsh
+		if _, err := io.WriteString(stdout, "compdef _himitsu himitsu\n"); err != nil {
 			err = fmt.Errorf("failed to run compdef: %w", err)
 			return apiError(err)
 		}
@@ -638,8 +638,8 @@ func createRun(cmd *cobra.Command, args []string) error {
 	}
 
 	switch t := ref.Type(); t {
-	case berglas.ReferenceTypeSecretManager:
-		secret, err := client.Create(ctx, &berglas.SecretManagerCreateRequest{
+	case himitsu.ReferenceTypeSecretManager:
+		secret, err := client.Create(ctx, &himitsu.SecretManagerCreateRequest{
 			Project:   ref.Project(),
 			Name:      ref.Name(),
 			Locations: smLocations,
@@ -650,14 +650,14 @@ func createRun(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintf(stdout, "Successfully created secret [%s] with version [%s]\n",
 			secret.Name, secret.Version)
-	case berglas.ReferenceTypeStorage:
+	case himitsu.ReferenceTypeStorage:
 		// Check if no unsupported options have been given
 		if len(smLocations) > 0 {
 			return misuseError(fmt.Errorf("locations on a per-secret basis unsupported for Storage keys"))
 		}
 
 		// Create the requested secret
-		secret, err := client.Create(ctx, &berglas.StorageCreateRequest{
+		secret, err := client.Create(ctx, &himitsu.StorageCreateRequest{
 			Bucket:    ref.Bucket(),
 			Object:    ref.Object(),
 			Key:       key,
@@ -689,8 +689,8 @@ func deleteRun(cmd *cobra.Command, args []string) error {
 	}
 
 	switch t := ref.Type(); t {
-	case berglas.ReferenceTypeSecretManager:
-		if err := client.Delete(ctx, &berglas.SecretManagerDeleteRequest{
+	case himitsu.ReferenceTypeSecretManager:
+		if err := client.Delete(ctx, &himitsu.SecretManagerDeleteRequest{
 			Project: ref.Project(),
 			Name:    ref.Name(),
 		}); err != nil {
@@ -698,8 +698,8 @@ func deleteRun(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintf(stdout, "Successfully deleted secret [%s] if it existed\n",
 			ref.Name())
-	case berglas.ReferenceTypeStorage:
-		if err := client.Delete(ctx, &berglas.StorageDeleteRequest{
+	case himitsu.ReferenceTypeStorage:
+		if err := client.Delete(ctx, &himitsu.StorageDeleteRequest{
 			Bucket: ref.Bucket(),
 			Object: ref.Object(),
 		}); err != nil {
@@ -739,18 +739,18 @@ func editRun(cmd *cobra.Command, args []string) error {
 		return misuseError(err)
 	}
 
-	var originalSecret *berglas.Secret
+	var originalSecret *himitsu.Secret
 
 	// Get the existing secret
 	switch t := ref.Type(); t {
-	case berglas.ReferenceTypeSecretManager:
-		originalSecret, err = client.Read(ctx, &berglas.SecretManagerReadRequest{
+	case himitsu.ReferenceTypeSecretManager:
+		originalSecret, err = client.Read(ctx, &himitsu.SecretManagerReadRequest{
 			Project: ref.Project(),
 			Name:    ref.Name(),
 			Version: ref.Version(),
 		})
-	case berglas.ReferenceTypeStorage:
-		originalSecret, err = client.Read(ctx, &berglas.StorageReadRequest{
+	case himitsu.ReferenceTypeStorage:
+		originalSecret, err = client.Read(ctx, &himitsu.StorageReadRequest{
 			Bucket:     ref.Bucket(),
 			Object:     ref.Object(),
 			Generation: ref.Generation(),
@@ -764,7 +764,7 @@ func editRun(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create the tempfile
-	f, err := ioutil.TempFile("", "berglas-")
+	f, err := ioutil.TempFile("", "himitsu-")
 	if err != nil {
 		err = fmt.Errorf("failed to create tempfile for secret: %w", err)
 		return apiError(err)
@@ -833,8 +833,8 @@ func editRun(cmd *cobra.Command, args []string) error {
 
 	// Update the secret
 	switch t := ref.Type(); t {
-	case berglas.ReferenceTypeSecretManager:
-		updatedSecret, err := client.Update(ctx, &berglas.SecretManagerUpdateRequest{
+	case himitsu.ReferenceTypeSecretManager:
+		updatedSecret, err := client.Update(ctx, &himitsu.SecretManagerUpdateRequest{
 			Project:   ref.Project(),
 			Name:      ref.Name(),
 			Plaintext: newPlaintext,
@@ -846,8 +846,8 @@ func editRun(cmd *cobra.Command, args []string) error {
 
 		fmt.Fprintf(stdout, "Successfully updated secret [%s] to version [%s]\n",
 			updatedSecret.Name, updatedSecret.Version)
-	case berglas.ReferenceTypeStorage:
-		updatedSecret, err := client.Update(ctx, &berglas.StorageUpdateRequest{
+	case himitsu.ReferenceTypeStorage:
+		updatedSecret, err := client.Update(ctx, &himitsu.StorageUpdateRequest{
 			Bucket:         ref.Bucket(),
 			Object:         ref.Object(),
 			Generation:     originalSecret.Generation,
@@ -889,7 +889,7 @@ func execRun(cmd *cobra.Command, args []string) error {
 		}
 
 		k, v := p[0], p[1]
-		if !berglas.IsReference(v) {
+		if !himitsu.IsReference(v) {
 			continue
 		}
 
@@ -929,8 +929,8 @@ func grantRun(cmd *cobra.Command, args []string) error {
 	sort.Strings(members)
 
 	switch t := ref.Type(); t {
-	case berglas.ReferenceTypeSecretManager:
-		if err := client.Grant(ctx, &berglas.SecretManagerGrantRequest{
+	case himitsu.ReferenceTypeSecretManager:
+		if err := client.Grant(ctx, &himitsu.SecretManagerGrantRequest{
 			Project: ref.Project(),
 			Name:    ref.Name(),
 			Members: members,
@@ -939,8 +939,8 @@ func grantRun(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintf(stdout, "Successfully granted permission on [%s] to: \n- %s\n",
 			ref.Name(), strings.Join(members, "\n- "))
-	case berglas.ReferenceTypeStorage:
-		if err := client.Grant(ctx, &berglas.StorageGrantRequest{
+	case himitsu.ReferenceTypeStorage:
+		if err := client.Grant(ctx, &himitsu.StorageGrantRequest{
 			Bucket:  ref.Bucket(),
 			Object:  ref.Object(),
 			Members: members,
@@ -963,12 +963,12 @@ func listRun(cmd *cobra.Command, args []string) error {
 		return misuseError(err)
 	}
 
-	var list *berglas.ListResponse
+	var list *himitsu.ListResponse
 
 	switch {
 	case strings.HasPrefix(args[0], "sm://"):
 		project := strings.Trim(strings.TrimPrefix(args[0], "sm://"), "/")
-		list, err = client.List(ctx, &berglas.SecretManagerListRequest{
+		list, err = client.List(ctx, &himitsu.SecretManagerListRequest{
 			Project:  project,
 			Prefix:   listPrefix,
 			Versions: listGenerations,
@@ -990,7 +990,7 @@ func listRun(cmd *cobra.Command, args []string) error {
 		tw.Flush()
 	default:
 		bucket := strings.Trim(strings.TrimPrefix(args[0], "gs://"), "/")
-		list, err = client.List(ctx, &berglas.ListRequest{
+		list, err = client.List(ctx, &himitsu.ListRequest{
 			Bucket:      bucket,
 			Prefix:      listPrefix,
 			Generations: listGenerations,
@@ -1024,7 +1024,7 @@ func migrateRun(cmd *cobra.Command, args []string) error {
 
 	bucket := strings.Trim(strings.TrimPrefix(args[0], "gs://"), "/")
 
-	storageList, err := client.List(ctx, &berglas.StorageListRequest{
+	storageList, err := client.List(ctx, &himitsu.StorageListRequest{
 		Bucket:      bucket,
 		Generations: true,
 	})
@@ -1037,7 +1037,7 @@ func migrateRun(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(stdout, "Migrating %s to projects/%s/secrets/%s... ",
 			s.Name, projectID, name)
 
-		secret, err := client.Read(ctx, &berglas.StorageReadRequest{
+		secret, err := client.Read(ctx, &himitsu.StorageReadRequest{
 			Bucket: s.Parent,
 			Object: s.Name,
 		})
@@ -1050,7 +1050,7 @@ func migrateRun(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		if _, err := client.Update(ctx, &berglas.SecretManagerUpdateRequest{
+		if _, err := client.Update(ctx, &himitsu.SecretManagerUpdateRequest{
 			Project:         projectID,
 			Name:            name,
 			Plaintext:       secret.Plaintext,
@@ -1080,8 +1080,8 @@ func revokeRun(cmd *cobra.Command, args []string) error {
 	sort.Strings(members)
 
 	switch t := ref.Type(); t {
-	case berglas.ReferenceTypeSecretManager:
-		if err := client.Revoke(ctx, &berglas.SecretManagerRevokeRequest{
+	case himitsu.ReferenceTypeSecretManager:
+		if err := client.Revoke(ctx, &himitsu.SecretManagerRevokeRequest{
 			Project: ref.Project(),
 			Name:    ref.Name(),
 			Members: members,
@@ -1090,8 +1090,8 @@ func revokeRun(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintf(stdout, "Successfully revoked permission on [%s] from: \n- %s\n",
 			ref.Name(), strings.Join(members, "\n- "))
-	case berglas.ReferenceTypeStorage:
-		if err := client.Revoke(ctx, &berglas.StorageRevokeRequest{
+	case himitsu.ReferenceTypeStorage:
+		if err := client.Revoke(ctx, &himitsu.StorageRevokeRequest{
 			Bucket:  ref.Bucket(),
 			Object:  ref.Object(),
 			Members: members,
@@ -1128,8 +1128,8 @@ func updateRun(cmd *cobra.Command, args []string) error {
 	}
 
 	switch t := ref.Type(); t {
-	case berglas.ReferenceTypeSecretManager:
-		secret, err := client.Update(ctx, &berglas.SecretManagerUpdateRequest{
+	case himitsu.ReferenceTypeSecretManager:
+		secret, err := client.Update(ctx, &himitsu.SecretManagerUpdateRequest{
 			Project:         ref.Project(),
 			Name:            ref.Name(),
 			Plaintext:       plaintext,
@@ -1140,8 +1140,8 @@ func updateRun(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Fprintf(stdout, "Successfully updated secret [%s] to version [%s]\n",
 			secret.Name, secret.Version)
-	case berglas.ReferenceTypeStorage:
-		secret, err := client.Update(ctx, &berglas.StorageUpdateRequest{
+	case himitsu.ReferenceTypeStorage:
+		secret, err := client.Update(ctx, &himitsu.StorageUpdateRequest{
 			Bucket:          ref.Bucket(),
 			Object:          ref.Object(),
 			Key:             key,
@@ -1204,7 +1204,7 @@ func logger() (*logrus.Logger, error) {
 	case "console", "text":
 		formatter = new(logrus.TextFormatter)
 	case "json":
-		formatter = new(berglas.LogFormatterStackdriver)
+		formatter = new(himitsu.LogFormatterStackdriver)
 	default:
 		return nil, fmt.Errorf("unknown log format %q", logFormat)
 	}
@@ -1217,17 +1217,17 @@ func logger() (*logrus.Logger, error) {
 	}, nil
 }
 
-// clientWithContext returns an instantiated berglas client and context with a
+// clientWithContext returns an instantiated himitsu client and context with a
 // closer.
-func clientWithContext(ctx context.Context) (*berglas.Client, error) {
+func clientWithContext(ctx context.Context) (*himitsu.Client, error) {
 	logger, err := logger()
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup logger: %w", err)
 	}
 
-	client, err := berglas.New(ctx)
+	client, err := himitsu.New(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create berglas client: %w", err)
+		return nil, fmt.Errorf("failed to create himitsu client: %w", err)
 	}
 	client.SetLogger(logger)
 
@@ -1260,20 +1260,20 @@ func readData(s string) ([]byte, error) {
 }
 
 // parseRef parses a secret ref and returns any errors.
-func parseRef(r string) (*berglas.Reference, error) {
+func parseRef(r string) (*himitsu.Reference, error) {
 	s := r
 
-	// Replace gs:// with berglas://
+	// Replace gs:// with himitsu://
 	if strings.HasPrefix(s, "gs://") {
-		s = "berglas://" + s[5:]
+		s = "himitsu://" + s[5:]
 	}
 
-	// If there's no protocol, assume berglas:// (backwards compat)
+	// If there's no protocol, assume himitsu:// (backwards compat)
 	if !strings.Contains(s, "://") {
-		s = "berglas://" + s
+		s = "himitsu://" + s
 	}
 
-	ref, err := berglas.ParseReference(s)
+	ref, err := himitsu.ParseReference(s)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse reference %q: %w", s, err)
 	}

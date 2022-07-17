@@ -2,7 +2,7 @@
 
 > "secret"
 
-Inspired by [berglas], `himitsu` is a fork created to work with AWS Secret Manager & S3.
+Inspired by [berglas], `himitsu` is a fork of [berglas] to work with AWS Secret Manager & S3.
 
 `himitsu` is a command line tool for storing and retrieving secret on AWS.
 

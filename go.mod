@@ -7,7 +7,6 @@ require (
 	cloud.google.com/go/kms v1.4.0
 	cloud.google.com/go/secretmanager v1.5.0
 	cloud.google.com/go/storage v1.23.0
-	github.com/GoogleCloudPlatform/berglas v0.6.2
 	github.com/sethvargo/go-retry v0.2.3
 	github.com/sirupsen/logrus v1.8.1
 	github.com/spf13/cobra v1.2.1
@@ -21,8 +20,6 @@ require (
 require (
 	cloud.google.com/go v0.102.1 // indirect
 	cloud.google.com/go/compute v1.7.0 // indirect
-	github.com/gammazero/deque v0.1.0 // indirect
-	github.com/gammazero/workerpool v1.1.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
@@ -31,7 +28,6 @@ require (
 	github.com/googleapis/gax-go/v2 v2.4.0 // indirect
 	github.com/googleapis/go-type-adapters v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/pkg/errors v0.9.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e // indirect
