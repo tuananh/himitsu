@@ -6,12 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"cloud.google.com/go/storage"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	awskms "github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/api/googleapi"
 	kmspb "google.golang.org/genproto/googleapis/cloud/kms/v1"
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -192,19 +191,23 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 	logger.Debug("creating S3 bucket")
 	input := &s3.CreateBucketInput{
 		Bucket: aws.String(bucket),
-		// ACL:    &s3.BucketCannedACLPrivate,
+		ACL:    aws.String(s3.BucketCannedACLPrivate),
 		CreateBucketConfiguration: &s3.CreateBucketConfiguration{
-			// TODO: (tuananh) remove hardcode region
-			// enable versioning, private by default and other stuff
 			LocationConstraint: aws.String(bucketLocation),
 		},
 	}
 
 	if _, err := c.s3Client.CreateBucketWithContext(ctx, input); err != nil {
 		logger.WithError(err).Error("failed to create S3 bucket")
+		if aerr, ok := err.(awserr.Error); ok {
+			if aerr.Code() == s3.ErrCodeBucketAlreadyExists {
+				return fmt.Errorf("bucket already exists. failed to create storage bucket %s: %w", bucket, err)
+			}
+		}
 		return fmt.Errorf("failed to create storage bucket %s: %w", bucket, err)
 	}
 
+	// Set bucket tags
 	putInput := &s3.PutBucketTaggingInput{
 		Bucket: aws.String(bucket),
 		Tagging: &s3.Tagging{
@@ -221,18 +224,6 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 		return fmt.Errorf("failed to S3 bucket tagging %s: %w", bucket, err)
 	}
 
-	// Set the bucket to private
-
-	aclInput := &s3.PutBucketAclInput{
-		Bucket: aws.String(bucket),
-		ACL:    aws.String(s3.BucketCannedACLPrivate),
-	}
-
-	if _, err := c.s3Client.PutBucketAclWithContext(ctx, aclInput); err != nil {
-		logger.WithError(err).Error("failed to put S3 bucket ACL")
-		return fmt.Errorf("failed to S3 bucket ACL %s: %w", bucket, err)
-	}
-
 	// Set versioning to enabled
 	versioningInput := &s3.PutBucketVersioningInput{
 		Bucket: aws.String(bucket),
@@ -247,62 +238,25 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 	}
 
 	// Set bucket lifecycle
-
-	// lifecycleInput := &s3.PutBucketLifecycleConfigurationInput{
-	// 	Bucket: aws.String(bucket),
-	// 	LifecycleConfiguration: &s3.BucketLifecycleConfiguration{
-	// 		Rules: []*s3.LifecycleRule{
-	// 			{
-	// 				Expiration: &s3.LifecycleExpiration{Days: 10},
-	// 			},
-	// 		},
-	// 	},
-	// }
-	// if _, err := c.s3Client.PutBucketLifecycleConfigurationWithContext(ctx, lifecycleInput); err != nil {
-	// 	logger.WithError(err).Error("failed to put S3 bucket lifecycle configuration")
-	// 	return fmt.Errorf("failed to S3 bucket lifecycle configuration %s: %w", bucket, err)
-	// }
-
-	// Create the storage bucket
-	logger.Debug("creating bucket")
-
-	if err := c.storageClient.Bucket(bucket).Create(ctx, projectID, &storage.BucketAttrs{
-		PredefinedACL:              "private",
-		PredefinedDefaultObjectACL: "private",
-		Location:                   bucketLocation,
-		VersioningEnabled:          true,
-		Lifecycle: storage.Lifecycle{
-			Rules: []storage.LifecycleRule{
+	lifecycleInput := &s3.PutBucketLifecycleConfigurationInput{
+		Bucket: aws.String(bucket),
+		LifecycleConfiguration: &s3.BucketLifecycleConfiguration{
+			Rules: []*s3.LifecycleRule{
 				{
-					Action: storage.LifecycleAction{
-						Type: "Delete",
+					NoncurrentVersionExpiration: &s3.NoncurrentVersionExpiration{
+						NewerNoncurrentVersions: aws.Int64(10),
 					},
-					Condition: storage.LifecycleCondition{
-						NumNewerVersions: 10,
+					Expiration: &s3.LifecycleExpiration{
+						ExpiredObjectDeleteMarker: aws.Bool(true),
 					},
 				},
 			},
 		},
-		Labels: map[string]string{
-			"purpose": "berglas",
-		},
-	}); err != nil {
-		logger.WithError(err).Error("failed to create bucket")
-
-		if !isBucketAlreadyExistsError(err) {
-			return fmt.Errorf("failed to create storage bucket %s: %w", bucket, err)
-		}
+	}
+	if _, err := c.s3Client.PutBucketLifecycleConfigurationWithContext(ctx, lifecycleInput); err != nil {
+		logger.WithError(err).Error("failed to put S3 bucket lifecycle configuration")
+		return fmt.Errorf("failed to S3 bucket lifecycle configuration %s: %w", bucket, err)
 	}
 
 	return nil
-}
-
-// isBucketAlreadyExistsError returns true if the given error corresponds to the
-// error that occurs when a bucket already exists.
-func isBucketAlreadyExistsError(err error) bool {
-	terr, ok := err.(*googleapi.Error)
-	if !ok {
-		return false
-	}
-	return terr.Code == 409 && strings.Contains(terr.Message, "You already own this bucket")
 }
