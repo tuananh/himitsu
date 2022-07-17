@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/kms"
 	awskms "github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/sirupsen/logrus"
@@ -132,32 +133,51 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 
 	// Create AWS KMS key ring
 	logger.Debug("creating AWS KMS key ring")
-	createKeyInput := &awskms.CreateKeyInput{}
+	createKeyInput := &awskms.CreateKeyInput{
+		CustomerMasterKeySpec: &kmsKeyRing,
+		Tags: []*kms.Tag{
+			{
+				TagKey:   aws.String("created-by"),
+				TagValue: aws.String("himitsu"),
+			},
+		},
+	}
 	if _, err := c.awsKmsClient.CreateKeyWithContext(ctx, createKeyInput); err != nil {
 		logger.WithError(err).Error("failed to create AWS KMS key ring")
-
-		return fmt.Errorf("failed to create AWS KMS key ring %s: %w", kmsKeyRing, err)
-	}
-
-	// Create the KMS key ring
-	logger.Debug("creating KMS key ring")
-
-	if _, err := c.kmsClient.CreateKeyRing(ctx, &kmspb.CreateKeyRingRequest{
-		Parent: fmt.Sprintf("projects/%s/locations/%s",
-			projectID, kmsLocation),
-		KeyRingId: kmsKeyRing,
-	}); err != nil {
-		logger.WithError(err).Error("failed to create KMS key ring")
-
-		terr, ok := grpcstatus.FromError(err)
-		if !ok || terr.Code() != grpccodes.AlreadyExists {
-			return fmt.Errorf("failed to create KMS key ring %s: %w", kmsKeyRing, err)
+		if aerr, ok := err.(awserr.Error); ok {
+			if aerr.Code() != kms.ErrCodeAlreadyExistsException {
+				return fmt.Errorf("failed to create KMS crypto key %s: %w", kmsKeyRing, err)
+			}
 		}
 	}
 
+	// // Create the KMS key ring
+	// logger.Debug("creating KMS key ring")
+
+	// if _, err := c.kmsClient.CreateKeyRing(ctx, &kmspb.CreateKeyRingRequest{
+	// 	Parent: fmt.Sprintf("projects/%s/locations/%s",
+	// 		projectID, kmsLocation),
+	// 	KeyRingId: kmsKeyRing,
+	// }); err != nil {
+	// 	logger.WithError(err).Error("failed to create KMS key ring")
+
+	// 	terr, ok := grpcstatus.FromError(err)
+	// 	if !ok || terr.Code() != grpccodes.AlreadyExists {
+	// 		return fmt.Errorf("failed to create KMS key ring %s: %w", kmsKeyRing, err)
+	// 	}
+	// }
+
 	// Create the KMS crypto key
 	logger.Debug("creating KMS crypto key")
+	datakeyInput := &kms.GenerateDataKeyInput{
+		KeyId: &kmsCryptoKey,
+	}
+	if _, err := c.awsKmsClient.GenerateDataKeyWithContext(ctx, datakeyInput); err != nil {
+		logger.WithError(err).Error("failed to create KMS data key")
+		return fmt.Errorf("failed to create KMS data key %s: %w", kmsCryptoKey, err)
+	}
 
+	// ...
 	rotationPeriod := 30 * 24 * time.Hour
 	if _, err := c.kmsClient.CreateCryptoKey(ctx, &kmspb.CreateCryptoKeyRequest{
 		Parent: fmt.Sprintf("projects/%s/locations/%s/keyRings/%s",
@@ -200,11 +220,10 @@ func (c *Client) storageBootstrap(ctx context.Context, i *StorageBootstrapReques
 	if _, err := c.s3Client.CreateBucketWithContext(ctx, input); err != nil {
 		logger.WithError(err).Error("failed to create S3 bucket")
 		if aerr, ok := err.(awserr.Error); ok {
-			if aerr.Code() == s3.ErrCodeBucketAlreadyExists {
-				return fmt.Errorf("bucket already exists. failed to create storage bucket %s: %w", bucket, err)
+			if aerr.Code() != s3.ErrCodeBucketAlreadyExists {
+				return fmt.Errorf("failed to create storage bucket %s: %w", bucket, err)
 			}
 		}
-		return fmt.Errorf("failed to create storage bucket %s: %w", bucket, err)
 	}
 
 	// Set bucket tags
